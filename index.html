@@ -6,9 +6,9 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>Upload an Image for Prediction</h1>
-    <form action="/predict" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept="image/*">
+    <h1>Enter an Image URL for Prediction</h1>
+    <form action="/predict" method="post">
+        <input type="text" name="image_url" placeholder="Enter image URL" required>
         <input type="submit" value="Predict">
     </form>
     {% if prediction %}
