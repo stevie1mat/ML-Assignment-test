@@ -3,7 +3,8 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 import numpy as np
 from PIL import Image
-import io
+import requests
+from io import BytesIO
 
 app = Flask(__name__)
 
@@ -18,17 +19,15 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    if 'file' not in request.files:
-        return redirect(url_for('index'))
+    image_url = request.form.get('image_url')
 
-    file = request.files['file']
-
-    if file.filename == '':
+    if not image_url:
         return redirect(url_for('index'))
 
     try:
-        # Read the image file
-        image = Image.open(file)
+        # Fetch the image from the URL
+        response = requests.get(image_url)
+        image = Image.open(BytesIO(response.content))
 
         # Convert the image to grayscale
         image = image.convert('L')
