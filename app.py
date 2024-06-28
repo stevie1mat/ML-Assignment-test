@@ -1,59 +1,92 @@
 from flask import Flask, request, render_template_string, redirect, url_for
 import tensorflow as tf
-from tensorflow.keras.models import load_model
-import numpy as np
 from PIL import Image
+import numpy as np
 import requests
 from io import BytesIO
 
 app = Flask(__name__)
 
-# Load the trained model
-model = load_model('fashion_mnist_model.h5')
+# Load the trained MNIST model
+model = tf.keras.models.load_model('mnist_model.h5')
 
-@app.route('/')
+def preprocess_image(image):
+    # Convert the image to grayscale and resize it to 28x28
+    image = image.convert('L')
+    image = image.resize((28, 28))
+    # Convert the image to a numpy array and normalize
+    image = np.array(image) / 255.0
+    # Expand dimensions to match the input shape for the model
+    image = np.expand_dims(image, axis=0)
+    image = np.expand_dims(image, axis=-1)
+    return image
+
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    with open('index.html', 'r') as file:
-        index_html = file.read()
-    return render_template_string(index_html)
+    if request.method == 'POST':
+        url = request.form['url']
+        try:
+            response = requests.get(url)
+            image = Image.open(BytesIO(response.content))
+            processed_image = preprocess_image(image)
+            prediction = model.predict(processed_image)
+            digit = np.argmax(prediction)
+            return render_template_string(html, url=url, digit=digit)
+        except Exception as e:
+            return str(e)
+    return render_template_string(html)
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    image_url = request.form.get('image_url')
-
-    if not image_url:
-        return redirect(url_for('index'))
-
-    try:
-        # Fetch the image from the URL
-        response = requests.get(image_url)
-        image = Image.open(BytesIO(response.content))
-
-        # Convert the image to grayscale
-        image = image.convert('L')
-
-        # Resize the image to 28x28 pixels
-        image = image.resize((28, 28))
-
-        # Convert the image to a numpy array
-        image_array = np.array(image)
-
-        # Normalize the image
-        image_array = image_array / 255.0
-
-        # Reshape the image for the model
-        image_array = image_array.reshape(1, 28, 28)
-
-        # Make a prediction
-        prediction = model.predict(image_array)
-        predicted_class = np.argmax(prediction, axis=1)[0]
-
-        # Render the result in the template
-        with open('index.html', 'r') as file:
-            index_html = file.read()
-        return render_template_string(index_html, prediction=predicted_class)
-
-    except Exception as e:
-        return str(e)
+html = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNIST Digit Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+        input[type=text] {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+        input[type=submit] {
+            padding: 10px 20px;
+            margin: 10px 0;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        input[type=submit]:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MNIST Digit Predictor</h1>
+    <form method="post">
+        <input type="text" name="url" placeholder="Enter the URL of a handwritten digit image" required>
+        <input type="submit" value="Predict">
+    </form>
+    {% if url %}
+        <div class="result">
+            <p><strong>Image URL:</strong> {{ url }}</p>
+            <p><strong>Predicted Digit:</strong> {{ digit }}</p>
+            <img src="{{ url }}" alt="Handwritten Digit Image" style="width: 200px; height: 200px;">
+        </div>
+    {% endif %}
+</body>
+</html>
+'''
 if __name__ == '__main__':
     app.run()
